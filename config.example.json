@@ -1,0 +1,5 @@
+{
+    "account_address": "0xYourWalletAddressHere",
+    "secret_key": "YourPrivateKeyHere",
+    "is_mainnet": true
+} 
