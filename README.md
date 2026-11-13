@@ -129,6 +129,38 @@ cp -r data/ data_backup_$(date +%Y%m%d_%H%M%S)/
 ```
 
 
+### Filling Gaps with Historical Data
+The collector only records while it is running, so anything before your first run, or from while the script was stopped, is missing. Three places to get older data:
+
+- **Hyperliquid's own API**: the `candleSnapshot` request on `https://api.hyperliquid.xyz/info` returns recent candles for one coin and interval (only the most recent 5,000 candles are available, about 3.5 days at the 1m interval this collector uses).
+- **Hyperliquid's S3 archive**: the requester-pays `hyperliquid-archive` bucket has L2 book snapshots (`market_data`) and asset contexts (`asset_ctxs`) as LZ4 files, uploaded about once a month. See [Historical data](https://hyperliquid.gitbook.io/hyperliquid-docs/historical-data).
+- **[Hydromancer Reservoir](https://docs.hydromancer.xyz/reservoir)**: a free archive of Hyperliquid history as daily Parquet files on S3, including 1-second candles (from 31 July 2025) and 20-level L2 order book snapshots every minute (from 15 December 2025). The bucket is requester-pays, so you need AWS credentials, and any S3 request and transfer charges go to your own AWS account.
+
+For example, this [DuckDB](https://duckdb.org) script copies one day of Reservoir's per-minute BTC order book snapshots into this repo's `orderbook` table, in the same units (Unix seconds, best bid/ask with their sizes, mid price):
+
+```sql
+INSTALL httpfs; LOAD httpfs;
+INSTALL sqlite; LOAD sqlite;
+CREATE SECRET (TYPE s3, PROVIDER credential_chain, REGION 'ap-northeast-1');
+SET s3_requester_pays = true;
+
+ATTACH 'data/BTC/BTC_main_market_data.db' AS hl (TYPE sqlite);
+
+INSERT INTO hl.orderbook
+SELECT
+    block_time_ms / 1000.0                                          AS timestamp,
+    CAST(bids[1].px AS DOUBLE)                                      AS best_bid,
+    CAST(bids[1].sz AS DOUBLE)                                      AS bid_volume,
+    CAST(asks[1].px AS DOUBLE)                                      AS best_ask,
+    CAST(asks[1].sz AS DOUBLE)                                      AS ask_volume,
+    (CAST(bids[1].px AS DOUBLE) + CAST(asks[1].px AS DOUBLE)) / 2   AS mid_price
+FROM read_parquet('s3://hydromancer-reservoir/by_dex/hyperliquid/orderbook/1m/perps/date=2026-11-10/BTC.parquet')
+WHERE len(bids) > 0 AND len(asks) > 0
+ORDER BY timestamp;
+```
+
+Reservoir has one snapshot per minute, so these rows are sparser than live ones. If the collector ran for part of that day, add a `WHERE timestamp` filter for the gap to avoid overlapping rows. Only the `orderbook` table is filled; the CSV files and `orderbook_depth` are not. Change the coin and date in the path (and the database name) to backfill other markets and days. Reservoir data is licensed under CC BY 4.0; credit it as `Data: Hydromancer Reservoir (reservoir.hydromancer.xyz), CC BY 4.0` if you publish anything built on it.
+
 ### Custom Coin List
 You can easily customize which coins to track by editing the coin list in `realtime_data_HL.py`:
 
