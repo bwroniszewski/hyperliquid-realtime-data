@@ -134,7 +134,7 @@ The collector only records while it is running, so anything before your first ru
 
 - **Hyperliquid's own API**: the `candleSnapshot` request on `https://api.hyperliquid.xyz/info` returns recent candles for one coin and interval (only the most recent 5,000 candles are available, about 3.5 days at the 1m interval this collector uses).
 - **Hyperliquid's S3 archive**: the requester-pays `hyperliquid-archive` bucket has L2 book snapshots (`market_data`) and asset contexts (`asset_ctxs`) as LZ4 files, uploaded about once a month. See [Historical data](https://hyperliquid.gitbook.io/hyperliquid-docs/historical-data).
-- **[Hydromancer Reservoir](https://docs.hydromancer.xyz/reservoir)**: a free archive of Hyperliquid history as daily Parquet files on S3, including 1-second candles (from 31 July 2025) and 20-level L2 order book snapshots every minute (from 15 December 2025). The bucket is requester-pays, so you need AWS credentials, and any S3 request and transfer charges go to your own AWS account.
+- **[Hydromancer Reservoir](https://docs.hydromancer.xyz/reservoir)**: a free Hyperliquid historical data archive, published as daily Parquet files on S3, including 1-second candles (from 31 July 2025) and 20-level L2 order book snapshots every minute (from 15 December 2025). The bucket is requester-pays, so you need AWS credentials, and any S3 request and transfer charges go to your own AWS account.
 
 For example, this [DuckDB](https://duckdb.org) script copies one day of Reservoir's per-minute BTC order book snapshots into this repo's `orderbook` table, in the same units (Unix seconds, best bid/ask with their sizes, mid price):
 
